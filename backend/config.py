@@ -9,11 +9,13 @@ MODELS_DIR = BASE_DIR / "models"
 RULES_DIR = BASE_DIR / "rules"
 DB_PATH = BASE_DIR / "osentinel.db"
 SANDBOX_DIR = PROJECT_ROOT / "live_threat_sandbox"
+DATA_DIR = PROJECT_ROOT / "data"
 
 # Ensure directories exist
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 RULES_DIR.mkdir(parents=True, exist_ok=True)
 SANDBOX_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Risk Assessment Thresholds
 RISK_THRESHOLD_LOW = 40.0       # < 40 is LOW (Log only)

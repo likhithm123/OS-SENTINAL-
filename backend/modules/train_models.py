@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
@@ -6,7 +7,7 @@ from sklearn.ensemble import IsolationForest, RandomForestClassifier
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from sklearn.model_selection import train_test_split
 
-from backend.config import MODELS_DIR
+from backend.config import DATA_DIR, MODELS_DIR
 from backend.database import get_db, init_db
 from backend.modules.module4_feature_extraction import FEATURE_NAMES
 
@@ -98,12 +99,27 @@ def generate_synthetic_telemetry(num_samples=2500):
     dataset = pd.concat(dfs, ignore_index=True).sample(frac=1.0, random_state=42).reset_index(drop=True)
     return dataset
 
+def export_dataset_to_csv(filepath=None, num_samples=3000):
+    """Exports generated 10-feature telemetry dataset to a CSV file."""
+    os.makedirs(DATA_DIR, exist_ok=True)
+    target_path = Path(filepath) if filepath else (DATA_DIR / "osentinel_10d_telemetry_dataset.csv")
+    df = generate_synthetic_telemetry(num_samples)
+    df.to_csv(target_path, index=False)
+    print(f"[OSentinel ML] Exported {len(df)} samples to {target_path}")
+    return target_path
+
 def train_and_save_models():
     os.makedirs(MODELS_DIR, exist_ok=True)
+    os.makedirs(DATA_DIR, exist_ok=True)
     init_db()
     
     print("[OSentinel ML] Generating synthetic security telemetry dataset...")
     df = generate_synthetic_telemetry(3000)
+    
+    # Save active dataset to CSV in data directory
+    csv_path = DATA_DIR / "osentinel_10d_telemetry_dataset.csv"
+    df.to_csv(csv_path, index=False)
+    print(f"[OSentinel ML] Saved active 10-feature telemetry dataset to {csv_path}")
     
     X = df[FEATURE_NAMES]
     y = df["label"]
