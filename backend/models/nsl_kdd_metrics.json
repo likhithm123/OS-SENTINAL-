@@ -1,0 +1,61 @@
+{
+  "dataset_name": "NSL-KDD Real-World Benchmark Dataset",
+  "total_records": 22543,
+  "test_records": 5636,
+  "num_features": 25,
+  "accuracy": 0.9844,
+  "precision": 0.9843,
+  "recall": 0.9844,
+  "f1_score": 0.9843,
+  "classes": [
+    "DoS",
+    "Normal",
+    "Other",
+    "Probe",
+    "R2L",
+    "U2R"
+  ],
+  "class_distribution": {
+    "Normal": 9710,
+    "DoS": 7458,
+    "R2L": 2885,
+    "Probe": 2421,
+    "U2R": 67,
+    "Other": 2
+  },
+  "top_features": [
+    {
+      "feature": "src_bytes",
+      "importance": 0.1372
+    },
+    {
+      "feature": "dst_bytes",
+      "importance": 0.1172
+    },
+    {
+      "feature": "flag",
+      "importance": 0.0917
+    },
+    {
+      "feature": "diff_srv_rate",
+      "importance": 0.0772
+    },
+    {
+      "feature": "dst_host_diff_srv_rate",
+      "importance": 0.0622
+    },
+    {
+      "feature": "count",
+      "importance": 0.0621
+    },
+    {
+      "feature": "duration",
+      "importance": 0.0576
+    },
+    {
+      "feature": "service",
+      "importance": 0.056
+    }
+  ],
+  "model_type": "Supervised Random Forest (Real-World Benchmark)"
+}

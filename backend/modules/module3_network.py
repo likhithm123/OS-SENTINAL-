@@ -183,6 +183,8 @@ def collect_network_telemetry():
                 })
     except (psutil.AccessDenied, PermissionError):
         # Fallback for non-root systems on macOS / Ubuntu / Windows:
+        priority_conns = []
+        normal_conns = []
         try:
             for p in psutil.process_iter(['pid', 'name']):
                 try:
@@ -204,8 +206,8 @@ def collect_network_telemetry():
                             restricted_flag = 1
                             restricted_count += 1
 
-                        if c.status in ["ESTABLISHED", "LISTEN"]:
-                            connections.append({
+                        if c.status in ["ESTABLISHED", "LISTEN", "SYN_SENT", "TIME_WAIT"]:
+                            conn_entry = {
                                 "fd": 0,
                                 "family": "IPv4",
                                 "type": "TCP",
@@ -218,15 +220,21 @@ def collect_network_telemetry():
                                 "matched_network": restr_cidr if is_restr else "",
                                 "restricted_reason": restr_desc if is_restr else "",
                                 "restriction_action": restr_act if is_restr else ""
-                            })
+                            }
+                            if is_restr or is_susp:
+                                priority_conns.append(conn_entry)
+                            elif len(normal_conns) < 35:
+                                normal_conns.append(conn_entry)
                 except Exception:
                     continue
-                if len(connections) >= 30:
-                    break
+            connections = priority_conns + normal_conns
         except Exception:
             pass
     except Exception:
         pass
+        
+    # Sort connections so restricted and suspicious are always at the top
+    connections.sort(key=lambda x: (not x.get("is_restricted"), not x.get("is_suspicious")))
         
     return {
         "outbound_conn_count": max(outbound_count, len(connections)),
@@ -234,6 +242,6 @@ def collect_network_telemetry():
         "restricted_ip_flag": restricted_flag,
         "restricted_conns_count": restricted_count,
         "data_exfil_kb_sec": max(real_exfil_rate, 2.5),
-        "connections": connections[:40],
+        "connections": connections[:50],
         "restricted_networks_count": active_restricted_count
     }

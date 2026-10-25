@@ -46,7 +46,8 @@ def extract_feature_vector(proc_telemetry: dict, file_telemetry: dict, net_telem
         "file_deletion_rate": file_deletion_rate,
         "browser_high_cpu_count": float(proc_telemetry.get("browser_high_cpu_count", 0)),
         "multiple_tabs_burst": 1.0 if proc_telemetry.get("multiple_tabs_burst") else 0.0,
-        "new_tab_count": float(proc_telemetry.get("new_tab_count", 0))
+        "new_tab_count": float(proc_telemetry.get("new_tab_count", 0)),
+        "lineage_anomaly_count": float(proc_telemetry.get("lineage_anomaly_count", 0))
     }
     
     vector = np.array([feature_dict[name] for name in FEATURE_NAMES], dtype=np.float32)

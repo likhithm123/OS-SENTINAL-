@@ -9,7 +9,7 @@ from backend.config import (
     WEIGHT_ANOMALY,
     WEIGHT_CLASSIFIER
 )
-from backend.database import create_alert, create_incident, log_event
+from backend.database import create_alert, create_incident, log_event, log_containment_action
 from backend.modules.module1_process import is_browser_process, is_browser_tab, is_ide_process
 
 def is_protected_system_process(pid: int, process_name: str) -> bool:
@@ -41,6 +41,8 @@ def calculate_risk_score(rule_result: dict, ml_result: dict) -> dict:
         threat_category = "Restricted Network Access"
     elif any(r.get("id") in ["RULE-BROWSER-01", "RULE-BROWSER-TABS-01"] for r in triggered_rules):
         threat_category = "Browser Cryptojacking"
+    elif any(r.get("id") == "RULE-LINEAGE-01" for r in triggered_rules):
+        threat_category = "Process Injection / Web Shell"
     
     if final_risk_score >= RISK_THRESHOLD_HIGH:
         severity = "HIGH"
@@ -59,6 +61,87 @@ def calculate_risk_score(rule_result: dict, ml_result: dict) -> dict:
             "classifier_component": round(WEIGHT_CLASSIFIER * classifier_score, 1)
         }
     }
+
+_quarantined_pids = set()
+
+def is_process_quarantined(pid: int) -> bool:
+    return pid in _quarantined_pids
+
+def get_quarantined_pids() -> list:
+    return list(_quarantined_pids)
+
+def quarantine_process_safe(
+    pid: int,
+    process_name: str,
+    reason: str = "Behavioral anomaly detected"
+) -> dict:
+    """
+    Reversible Containment: Freezes execution using POSIX SIGSTOP (or NtSuspendProcess on Windows).
+    Preserves process memory and state for forensic investigation without allowing malicious execution.
+    """
+    if is_ide_process(process_name):
+        return {
+            "success": False,
+            "message": f"AntiGravity IDE ({process_name}, PID {pid}) is exempted from quarantine."
+        }
+    if is_protected_system_process(pid, process_name):
+        return {
+            "success": False,
+            "message": f"System core process {process_name} (PID {pid}) cannot be quarantined."
+        }
+    try:
+        if psutil.pid_exists(pid):
+            p = psutil.Process(pid)
+            p.suspend()
+            _quarantined_pids.add(pid)
+            log_containment_action(
+                incident_id=0,
+                target_pid=pid,
+                target_name=process_name,
+                action_taken="QUARANTINE_SIGSTOP",
+                status="SUCCESS",
+                details=f"Suspended execution using POSIX SIGSTOP. Reason: {reason}"
+            )
+            return {
+                "success": True,
+                "message": f"Successfully quarantined (frozen via SIGSTOP): {process_name} (PID {pid})"
+            }
+        else:
+            return {"success": False, "message": f"Process PID {pid} no longer running."}
+    except (psutil.AccessDenied, PermissionError):
+        return {"success": False, "message": f"Permission denied suspending PID {pid}."}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+def resume_process_safe(
+    pid: int,
+    process_name: str
+) -> dict:
+    """
+    Reversible Containment: Resumes execution using POSIX SIGCONT (or NtResumeProcess on Windows).
+    """
+    try:
+        if psutil.pid_exists(pid):
+            p = psutil.Process(pid)
+            p.resume()
+            _quarantined_pids.discard(pid)
+            log_containment_action(
+                incident_id=0,
+                target_pid=pid,
+                target_name=process_name,
+                action_taken="RESUME_SIGCONT",
+                status="SUCCESS",
+                details=f"Resumed execution using POSIX SIGCONT."
+            )
+            return {
+                "success": True,
+                "message": f"Successfully resumed (unfrozen via SIGCONT): {process_name} (PID {pid})"
+            }
+        else:
+            _quarantined_pids.discard(pid)
+            return {"success": True, "message": f"Process PID {pid} already stopped."}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
 
 def terminate_process_safe(
     pid: int,
@@ -87,6 +170,7 @@ def terminate_process_safe(
         
     # 2. Execute process termination (supports browser tabs, rogue writers, and miners)
     try:
+        _quarantined_pids.discard(pid)
         if psutil.pid_exists(pid):
             p = psutil.Process(pid)
             p.terminate()
@@ -248,7 +332,14 @@ def triage_and_respond(proc_telemetry: dict, file_telemetry: dict, net_telemetry
                         p_name = p.get("name", "network_process")
                         p_cmd = p.get("cmdline", "")
                         p_exe = p.get("exe", "")
-                        break
+                if p_name == "network_process":
+                    try:
+                        p_obj = psutil.Process(p_pid)
+                        p_name = p_obj.name()
+                        p_cmd = " ".join(p_obj.cmdline())
+                        p_exe = p_obj.exe()
+                    except Exception:
+                        pass
                         
                 if not is_ide_process(p_name, p_cmd, p_exe):
                     kill_res = terminate_process_safe(p_pid, p_name, cmdline=p_cmd, force=True)

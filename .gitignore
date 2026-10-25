@@ -50,3 +50,6 @@ Thumbs.db
 # Coverage
 .coverage
 htmlcov/
+
+# Temporary Sandbox Test Runs
+live_threat_sandbox/containment_proof/

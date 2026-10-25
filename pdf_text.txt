@@ -16,7 +16,7 @@ Abstract
 OSentinel is an intelligent host-based security framework for Ubuntu
 Linux that combines rule-based detection with machine learning to identify
 suspicious and abnormal activity in real time. It monitors processes, file system
-activity, and network connections, converting system events into useful
+activity, and network connections, converting system events into usefuly
 behavioral features.
 Two detection engines work together the rule engine identifies known
 threats such as suspicious program execution or mass file encryption, while the

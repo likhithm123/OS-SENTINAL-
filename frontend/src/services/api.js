@@ -107,6 +107,56 @@ export async function toggleRestrictedNetwork(networkId) {
   return res.json();
 }
 
+export async function fetchDatasets() {
+  const res = await fetch(`${API_BASE}/datasets`);
+  if (!res.ok) throw new Error("Failed to fetch datasets");
+  return res.json();
+}
+
+export async function fetchBenchmarkMetrics() {
+  const res = await fetch(`${API_BASE}/datasets/benchmark-metrics`);
+  if (!res.ok) throw new Error("Failed to fetch benchmark metrics");
+  return res.json();
+}
+
+export async function recordLiveSamples(samples = 20, label = "Normal") {
+  const res = await fetch(`${API_BASE}/datasets/record-live?samples=${samples}&label=${encodeURIComponent(label)}`, {
+    method: "POST"
+  });
+  if (!res.ok) throw new Error("Failed to record live samples");
+  return res.json();
+}
+
+export async function fetchEntropyDocPreview() {
+  const res = await fetch(`${API_BASE}/entropy/preview`);
+  if (!res.ok) throw new Error("Failed to fetch entropy document preview");
+  return res.json();
+}
+
+export async function createEntropyWordDoc() {
+  const res = await fetch(`${API_BASE}/entropy/create-doc`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to create entropy word document");
+  return res.json();
+}
+
+export async function runRapidWordWrites() {
+  const res = await fetch(`${API_BASE}/entropy/rapid-writes`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to run rapid word writes");
+  return res.json();
+}
+
+export async function runRansomwareEncryption() {
+  const res = await fetch(`${API_BASE}/entropy/encrypt`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to run ransomware encryption");
+  return res.json();
+}
+
+export async function restoreEntropyDoc() {
+  const res = await fetch(`${API_BASE}/entropy/restore`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to restore entropy document");
+  return res.json();
+}
+
 export function connectWebSocket(onMessage, onError, onClose) {
   const socket = new WebSocket(WS_URL);
 

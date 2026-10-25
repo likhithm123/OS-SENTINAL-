@@ -126,27 +126,47 @@ def train_and_save_models():
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)
     
-    # 1. Train Unsupervised Isolation Forest (trained on Normal traffic samples)
+    # 1. Apply SMOTE (Synthetic Minority Over-sampling Technique) to balance rare cyber attack vectors
+    smote_applied = False
+    try:
+        from imblearn.over_sampling import SMOTE
+        print("[OSentinel ML] Applying SMOTE to balance threat attack vectors...")
+        smote = SMOTE(random_state=42)
+        X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
+        smote_applied = True
+        print(f"[OSentinel ML] SMOTE balanced training set from {len(X_train)} to {len(X_train_res)} samples.")
+    except Exception as e:
+        print(f"[OSentinel ML] SMOTE skipped or unavailable ({e}); using original split.")
+        X_train_res, y_train_res = X_train, y_train
+
+    # 2. Train Unsupervised Isolation Forest (trained on Normal baseline samples)
     print("[OSentinel ML] Training Isolation Forest anomaly detector...")
     X_normal_train = X_train[y_train == "Normal"]
     iso_forest = IsolationForest(n_estimators=100, contamination=0.05, random_state=42)
     iso_forest.fit(X_normal_train)
     
-    # 2. Train Supervised Random Forest Classifier
+    # 3. Train Supervised Random Forest Classifier on SMOTE-balanced data
     print("[OSentinel ML] Training Random Forest multi-class threat classifier...")
     rf_classifier = RandomForestClassifier(n_estimators=100, max_depth=12, random_state=42)
-    rf_classifier.fit(X_train, y_train)
+    rf_classifier.fit(X_train_res, y_train_res)
     
-    # Evaluate Classifier
+    # 4. Evaluate Classifier on held-out test data
     y_pred = rf_classifier.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
     prec, rec, f1, _ = precision_recall_fscore_support(y_test, y_pred, average='weighted')
+    
+    # 5. Compute Real Multi-Class Confusion Matrix
+    from sklearn.metrics import confusion_matrix, classification_report
+    classes = list(rf_classifier.classes_)
+    cm = confusion_matrix(y_test, y_pred, labels=classes)
+    report = classification_report(y_test, y_pred, labels=classes, output_dict=True)
     
     print(f"[OSentinel ML] Model Evaluation Results:")
     print(f"  - Accuracy:  {acc*100:.2f}%")
     print(f"  - Precision: {prec*100:.2f}%")
     print(f"  - Recall:    {rec*100:.2f}%")
     print(f"  - F1-Score:  {f1*100:.2f}%")
+    print(f"  - SMOTE Applied: {smote_applied}")
     
     # Save Model Artifacts
     joblib.dump(iso_forest, MODELS_DIR / "isolation_forest.joblib")
@@ -159,8 +179,17 @@ def train_and_save_models():
         "precision": round(prec, 4),
         "recall": round(rec, 4),
         "f1_score": round(f1, 4),
+        "smote_applied": smote_applied,
+        "dataset_name": "OSentinel Host Behavioral Dataset (SMOTE Balanced)",
+        "train_samples": len(X_train_res),
+        "test_samples": len(X_test),
+        "confusion_matrix": {
+            "labels": classes,
+            "matrix": cm.tolist()
+        },
+        "classification_report": report,
         "feature_importances": feature_importances,
-        "labels": list(rf_classifier.classes_)
+        "labels": classes
     }
     
     joblib.dump(meta_info, MODELS_DIR / "model_metadata.joblib")
@@ -170,12 +199,12 @@ def train_and_save_models():
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO ml_metrics (accuracy, precision, recall, f1_score, model_version) VALUES (?, ?, ?, ?, ?)",
-        (round(acc, 4), round(prec, 4), round(rec, 4), round(f1, 4), "1.0.0")
+        (round(acc, 4), round(prec, 4), round(rec, 4), round(f1, 4), "1.1.0-SMOTE")
     )
     conn.commit()
     conn.close()
     
-    print("[OSentinel ML] Model training & artifact export complete!")
+    print("[OSentinel ML] Model training & artifact export complete with SMOTE & Confusion Matrix!")
     return meta_info
 
 if __name__ == "__main__":

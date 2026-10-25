@@ -78,11 +78,10 @@ def is_ide_process(process_name: str, cmdline: str = "", exe: str = "") -> bool:
     if "antigravity" in text:
         return True
         
-    # Core workspace developer processes
-    dev_names = ["electron", "vscode", "cursor", "language_server", "uvicorn", "vite", "node", "python", "python3"]
-    if name_clean in dev_names:
+    # Core workspace developer processes and OSentinel daemon
+    if any(d in text for d in ["antigravity", "backend.main", "uvicorn", "vite", "language_server"]):
         return True
-    if any(d in name_clean for d in ["antigravity", "electron", "cursor"]):
+    if any(d in name_clean for d in ["electron", "vscode", "cursor"]):
         return True
     if re.search(r'\b(code|vscode|electron|cursor|language_server)\b', name_clean):
         return True
@@ -137,6 +136,7 @@ def collect_process_telemetry():
     processes = []
     tmp_execution_count = 0
     browser_high_cpu_count = 0
+    lineage_anomaly_count = 0
     current_tab_pids = set()
     total_cpu = 0.0
     total_mem = 0.0
@@ -206,16 +206,49 @@ def collect_process_telemetry():
             total_cpu += cpu
             total_mem += mem
             
+            # Process state & quarantine tracking
+            proc_status = "RUNNING"
+            try:
+                raw_st = proc.status()
+                if raw_st in (psutil.STATUS_STOPPED, 'stopped'):
+                    proc_status = "QUARANTINED"
+                elif raw_st in (psutil.STATUS_ZOMBIE, 'zombie'):
+                    proc_status = "ZOMBIE"
+            except Exception:
+                pass
+                
+            # Process Parent Lineage Inspection (OS Hierarchy)
+            ppid = info['ppid'] or 0
+            parent_name = "system"
+            if ppid > 0:
+                try:
+                    p_parent = psutil.Process(ppid)
+                    parent_name = p_parent.name()
+                except Exception:
+                    parent_name = "unknown"
+            
+            # Detect anomalous parent-child lineage (e.g. browser or office app spawning bash/sh/curl)
+            is_lineage_anomaly = False
+            suspicious_children = ["sh", "bash", "zsh", "cmd.exe", "powershell.exe", "curl", "wget", "nc", "python"]
+            suspicious_parents = ["safari", "chrome", "firefox", "word", "excel", "acrobat", "preview", "slack"]
+            if any(name.lower() == sc or name.lower().startswith(sc) for sc in suspicious_children):
+                if any(sp in parent_name.lower() for sp in suspicious_parents):
+                    is_lineage_anomaly = True
+                    lineage_anomaly_count += 1
+
             processes.append({
                 "pid": pid,
-                "ppid": info['ppid'],
+                "ppid": ppid,
+                "parent_name": parent_name,
                 "name": name,
                 "exe": info['exe'] or "",
                 "cmdline": raw_cmdline,
                 "cpu_percent": round(cpu, 1),
                 "memory_percent": round(mem, 1),
                 "user": info['username'] or "system",
+                "status": proc_status,
                 "is_tmp": is_tmp,
+                "is_lineage_anomaly": is_lineage_anomaly,
                 "is_browser": is_browser,
                 "is_browser_tab": is_tab,
                 "is_ide": is_ide
@@ -324,6 +357,7 @@ def collect_process_telemetry():
         "multiple_tabs_burst": multiple_tabs_burst,
         "new_tab_count": len(new_tab_pids),
         "new_tab_pids": list(new_tab_pids),
+        "lineage_anomaly_count": lineage_anomaly_count,
         "avg_cpu_percent": round(total_cpu / max(1, current_count), 2),
         "total_cpu_percent": round(total_cpu, 1),
         "spawn_rate": round(spawn_velocity, 2)

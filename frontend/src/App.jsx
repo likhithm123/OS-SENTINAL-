@@ -41,9 +41,30 @@ export default function App() {
   const handleTerminateProcess = async (pid, processName) => {
     try {
       await containIncident(0, pid, processName, 'TERMINATE');
-      alert(`Process termination request sent for PID ${pid} (${processName}).`);
+      const updated = await fetchIncidents();
+      setIncidents(updated);
     } catch (e) {
       alert(`Error terminating process: ${e.message}`);
+    }
+  };
+
+  const handleQuarantineProcess = async (pid, processName) => {
+    try {
+      await containIncident(0, pid, processName, 'QUARANTINE');
+      const updated = await fetchIncidents();
+      setIncidents(updated);
+    } catch (e) {
+      alert(`Error quarantining process: ${e.message}`);
+    }
+  };
+
+  const handleResumeProcess = async (pid, processName) => {
+    try {
+      await containIncident(0, pid, processName, 'RESUME');
+      const updated = await fetchIncidents();
+      setIncidents(updated);
+    } catch (e) {
+      alert(`Error resuming process: ${e.message}`);
     }
   };
 
@@ -86,6 +107,8 @@ export default function App() {
             <ProcessMonitor
               procTelemetry={statusData?.process_telemetry || {}}
               onTerminateProcess={handleTerminateProcess}
+              onQuarantineProcess={handleQuarantineProcess}
+              onResumeProcess={handleResumeProcess}
             />
           )}
 

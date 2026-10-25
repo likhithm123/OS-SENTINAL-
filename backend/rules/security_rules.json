@@ -70,5 +70,13 @@
     "condition": "restricted_ip_flag >= 1",
     "weight": 85,
     "description": "Active socket communication intercepted to/from a restricted IP subnet or blacklisted network address."
+  },
+  {
+    "id": "RULE-LINEAGE-01",
+    "name": "Anomalous Process Lineage & Shell Spawning",
+    "category": "Process Injection / Web Shell",
+    "condition": "lineage_anomaly_count >= 1",
+    "weight": 75,
+    "description": "Suspicious parent-child lineage: An interactive shell or utility was spawned by a desktop app or browser."
   }
 ]

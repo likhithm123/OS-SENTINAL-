@@ -330,14 +330,19 @@ button {
 .text-2xl { font-size: 1.5rem; line-height: 2rem; }
 .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
 
-/* Colors (Clean, High Contrast Light Palette) */
 .text-slate-900 { color: #0f172a; }
 .text-slate-800 { color: #1e293b; }
 .text-slate-700 { color: #334155; }
 .text-slate-600 { color: #475569; }
 .text-slate-500 { color: #64748b; }
 .text-slate-400 { color: #94a3b8; }
-.text-white { color: #ffffff; }
+.text-slate-300 { color: #cbd5e1; }
+.text-slate-200 { color: #e2e8f0; }
+.text-slate-100 { color: #f1f5f9; }
+.text-slate-50  { color: #f8fafc; }
+.text-white { color: #ffffff !important; }
+
+.bg-slate-950 { background-color: #020617; }
 
 .text-rose-600 { color: #e11d48; }
 .text-rose-700 { color: #be123c; }

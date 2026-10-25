@@ -235,3 +235,14 @@ def update_incident_status(incident_id, status, containment_action=None):
         cursor.execute("UPDATE incidents SET status = ? WHERE id = ?", (status, incident_id))
     conn.commit()
     conn.close()
+
+def log_containment_action(incident_id: int, target_pid: int, target_name: str, action_taken: str, status: str = "SUCCESS", details: str = ""):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        """INSERT INTO containments (incident_id, target_pid, target_name, action_taken, status, details)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (incident_id, target_pid, target_name, action_taken, status, details)
+    )
+    conn.commit()
+    conn.close()

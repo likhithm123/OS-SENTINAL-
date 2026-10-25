@@ -122,22 +122,46 @@ export default function IncidentsList({ incidents, onContainIncident }) {
             </div>
 
             {/* Containment Override Action Bar */}
-            {selectedIncident.status === 'OPEN' && (
+            {(selectedIncident.status === 'OPEN' || selectedIncident.status === 'QUARANTINED') && (
               <div className="p-4 rounded-lg bg-red-50 border border-red-200 flex flex-col sm:flex-row items-center justify-between gap-3 mb-4">
                 <div>
                   <h4 className="font-extrabold text-xs text-red-900 uppercase font-mono m-0">Operator Containment Actions</h4>
-                  <p className="text-xs text-slate-600 font-mono m-0 mt-0.5">Force terminate suspicious target PID {selectedIncident.pid}</p>
+                  <p className="text-xs text-slate-600 font-mono m-0 mt-0.5">Control process execution state for PID {selectedIncident.pid} ({selectedIncident.process_name})</p>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedIncident.status === 'QUARANTINED' ? (
+                    <button
+                      onClick={() => {
+                        onContainIncident(selectedIncident.id, selectedIncident.pid, selectedIncident.process_name, "RESUME");
+                        setSelectedIncident(null);
+                      }}
+                      className="btn-bold-secondary"
+                      style={{ padding: '6px 12px', fontSize: '11px', color: '#047857', borderColor: '#a7f3d0', backgroundColor: '#ecfdf5' }}
+                    >
+                      <span>RESUME (SIGCONT)</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        onContainIncident(selectedIncident.id, selectedIncident.pid, selectedIncident.process_name, "QUARANTINE");
+                        setSelectedIncident(null);
+                      }}
+                      className="btn-bold-secondary"
+                      style={{ padding: '6px 12px', fontSize: '11px', color: '#b45309', borderColor: '#fde68a', backgroundColor: '#fffbeb' }}
+                    >
+                      <span>FREEZE (SIGSTOP)</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       onContainIncident(selectedIncident.id, selectedIncident.pid, selectedIncident.process_name, "TERMINATE");
                       setSelectedIncident(null);
                     }}
                     className="btn-bold-danger"
+                    style={{ padding: '6px 12px', fontSize: '11px' }}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>TERMINATE PID {selectedIncident.pid}</span>
+                    <span>TERMINATE</span>
                   </button>
                   <button
                     onClick={() => {
@@ -145,6 +169,7 @@ export default function IncidentsList({ incidents, onContainIncident }) {
                       setSelectedIncident(null);
                     }}
                     className="btn-bold-secondary"
+                    style={{ padding: '6px 12px', fontSize: '11px' }}
                   >
                     DISMISS
                   </button>

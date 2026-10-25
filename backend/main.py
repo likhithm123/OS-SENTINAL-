@@ -28,7 +28,13 @@ from backend.modules.module3_network import collect_network_telemetry
 from backend.modules.module4_feature_extraction import extract_feature_vector
 from backend.modules.module5_rule_engine import evaluate_rules
 from backend.modules.module6_ml_engine import run_ml_inference, get_ml_metrics, load_ml_models
-from backend.modules.module7_risk_assessment import calculate_risk_score, triage_and_respond, terminate_process_safe
+from backend.modules.module7_risk_assessment import (
+    calculate_risk_score,
+    triage_and_respond,
+    terminate_process_safe,
+    quarantine_process_safe,
+    resume_process_safe
+)
 from backend.modules.attack_simulator import trigger_attack_simulation, get_active_simulation
 from backend.modules.train_models import train_and_save_models
 
@@ -116,6 +122,15 @@ def telemetry_polling_loop():
             
             active_sim = get_active_simulation()
             
+            # Periodically log real host telemetry sample (every ~10 seconds)
+            if int(time.time()) % 10 < int(POLL_INTERVAL_SEC):
+                try:
+                    from backend.modules.live_data_collector import record_live_telemetry_sample
+                    current_label = risk_res.get("threat_category", "Normal")
+                    record_live_telemetry_sample(label=current_label if current_label else "Normal")
+                except Exception:
+                    pass
+                    
             # Update Global Telemetry Cache
             current_telemetry_state = {
                 "status": "ONLINE",
@@ -177,19 +192,32 @@ def simulate_attack(req: AttackSimRequest):
     return res
 
 class ContainRequest(BaseModel):
-    incident_id: int
+    incident_id: int = 0
     pid: int
     process_name: str
-    action: str  # "TERMINATE" or "IGNORE"
+    action: str  # "TERMINATE", "QUARANTINE", "RESUME", or "IGNORE"
 
 @app.post("/api/contain")
 def contain_incident(req: ContainRequest):
-    if req.action == "TERMINATE":
+    act = req.action.upper()
+    if act == "TERMINATE":
         res = terminate_process_safe(req.pid, req.process_name, force=True)
-        update_incident_status(req.incident_id, "RESOLVED", f"MANUAL_TERMINATE (PID {req.pid})")
-        return {"success": True, "message": res["message"]}
+        if req.incident_id > 0:
+            update_incident_status(req.incident_id, "RESOLVED", f"MANUAL_TERMINATE (PID {req.pid})")
+        return {"success": res.get("success", True), "message": res["message"]}
+    elif act == "QUARANTINE":
+        res = quarantine_process_safe(req.pid, req.process_name, reason="Manual operator quarantine via SOC")
+        if req.incident_id > 0:
+            update_incident_status(req.incident_id, "QUARANTINED", f"QUARANTINED_SIGSTOP (PID {req.pid})")
+        return {"success": res.get("success", True), "message": res["message"]}
+    elif act == "RESUME":
+        res = resume_process_safe(req.pid, req.process_name)
+        if req.incident_id > 0:
+            update_incident_status(req.incident_id, "INVESTIGATING", f"RESUMED_SIGCONT (PID {req.pid})")
+        return {"success": res.get("success", True), "message": res["message"]}
     else:
-        update_incident_status(req.incident_id, "DISMISSED", "MANUAL_IGNORE")
+        if req.incident_id > 0:
+            update_incident_status(req.incident_id, "DISMISSED", "MANUAL_IGNORE")
         return {"success": True, "message": "Incident marked as dismissed."}
 
 @app.post("/api/retrain")
@@ -238,6 +266,61 @@ def toggle_network(network_id: int):
     if not updated:
         raise HTTPException(status_code=404, detail="Restricted network entry not found.")
     return {"success": True, "network": updated}
+
+# --- DATASET MANAGEMENT & REAL-WORLD BENCHMARK ENDPOINTS ---
+from backend.modules.dataset_manager import (
+    get_all_datasets_summary,
+    get_nsl_kdd_metrics,
+    train_nsl_kdd_benchmark
+)
+from backend.modules.live_data_collector import (
+    collect_live_dataset_batch,
+    get_live_dataset_stats
+)
+
+@app.get("/api/datasets")
+def fetch_datasets():
+    """Returns metadata and statistics on all synthetic, benchmark, and live host datasets."""
+    return get_all_datasets_summary()
+
+@app.get("/api/datasets/benchmark-metrics")
+def fetch_benchmark_metrics():
+    """Returns evaluation metrics on the real-world NSL-KDD benchmark dataset."""
+    return get_nsl_kdd_metrics()
+
+@app.post("/api/datasets/record-live")
+def record_live_samples(samples: int = 20, label: str = "Normal"):
+    """Collects real-time host telemetry samples from the local machine into the live CSV dataset."""
+    res = collect_live_dataset_batch(num_samples=min(100, max(1, samples)), interval_sec=0.2, label=label)
+    return res
+
+# --- FILE ENTROPY GENERATOR & VISUALIZER ENDPOINTS ---
+from backend.modules.entropy_demo import (
+    create_word_document,
+    simulate_rapid_word_writes,
+    simulate_ransomware_encryption,
+    get_word_document_preview
+)
+
+@app.get("/api/entropy/preview")
+def fetch_entropy_doc_preview():
+    return get_word_document_preview()
+
+@app.post("/api/entropy/create-doc")
+def create_entropy_word_doc():
+    return create_word_document()
+
+@app.post("/api/entropy/rapid-writes")
+def run_rapid_word_writes():
+    return simulate_rapid_word_writes()
+
+@app.post("/api/entropy/encrypt")
+def run_ransomware_encryption():
+    return simulate_ransomware_encryption()
+
+@app.post("/api/entropy/restore")
+def restore_entropy_doc():
+    return create_word_document()
 
 # --- WEBSOCKET ENDPOINT ---
 
